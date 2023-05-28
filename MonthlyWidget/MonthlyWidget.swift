@@ -22,11 +22,13 @@ struct Provider: IntentTimelineProvider {
     func getTimeline(for configuration: ConfigurationIntent, in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
         var entries: [DayEntry] = []
 
-        // Generate a timeline consisting of five entries an hour apart, starting from the current date.
+        // Generate a timeline consisting of seven entries a day apart, starting from the current date.
+        
         let currentDate = Date()
-        for hourOffset in 0 ..< 5 {
-            let entryDate = Calendar.current.date(byAdding: .hour, value: hourOffset, to: currentDate)!
-            let entry = DayEntry(date: entryDate, configuration: configuration)
+        for dayOffset in 0 ..< 7 {
+            let entryDate = Calendar.current.date(byAdding: .day, value: dayOffset, to: currentDate)!
+            let startOfDate = Calendar.current.startOfDay(for: entryDate)
+            let entry = DayEntry(date: startOfDate, configuration: configuration)
             entries.append(entry)
         }
 
@@ -38,22 +40,40 @@ struct Provider: IntentTimelineProvider {
 struct DayEntry: TimelineEntry {
     let date: Date
     let configuration: ConfigurationIntent
+    
 }
 
 struct MonthlyWidgetEntryView : View {
-    var entry: Provider.Entry
-
+    var entry: DayEntry
+    var config: MonthConfig
+    
+    init(entry: DayEntry) {
+        self.entry = entry
+        self.config = MonthConfig.determineConfig(from: entry.date)
+    }
+    
     var body: some View {
         ZStack {
             ContainerRelativeShape()
-                .fill(.gray.gradient)
+                .fill(config.backgroundColor.gradient)
             VStack {
-                HStack {
-                    Text("⛄️")
-                    Text(entry.date.formatted(.dateTime.weekday(.wide)))
+                HStack (spacing: 4){
+                    Text(config.emojiText)
+                        .font(.title )
+                    
+                    Text(entry.date.weekdayDisplayFormat)
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .minimumScaleFactor(0.6)
+                        .foregroundColor(config.weekdayTextColor)
+                    Spacer()
                 }
+                
+                Text(entry.date.dayDisplayFormat)
+                    .font(.system(size: 80, weight: .heavy))
+                    .foregroundColor(config.dayTextColor)
             }
-            
+            .padding()
         }
         
     }
@@ -66,14 +86,31 @@ struct MonthlyWidget: Widget {
         IntentConfiguration(kind: kind, intent: ConfigurationIntent.self, provider: Provider()) { entry in
             MonthlyWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("My Widget")
-        .description("This is an example widget.")
+        .configurationDisplayName("Monthly Style Widget")
+        .description("The theme of the widget changes based on month.")
+        .supportedFamilies([.systemSmall])
+     
     }
 }
 
 struct MonthlyWidget_Previews: PreviewProvider {
     static var previews: some View {
-        MonthlyWidgetEntryView(entry: DayEntry(date: Date(), configuration: ConfigurationIntent()))
+        MonthlyWidgetEntryView(entry: DayEntry(date: dateToDisplay(month: 12, day: 22), configuration: ConfigurationIntent()))
             .previewContext(WidgetPreviewContext(family: .systemSmall))
+    }
+    
+    static func dateToDisplay(month: Int, day: Int) -> Date {
+        let components  = DateComponents(calendar: Calendar.current, year: 2023, month: month , day: day)
+        return Calendar.current.date(from: components)!
+    }
+}
+
+extension Date{
+    var weekdayDisplayFormat: String {
+        self.formatted(.dateTime.weekday(.wide))
+    }
+    
+    var dayDisplayFormat: String {
+        self.formatted(.dateTime.day())
     }
 }
